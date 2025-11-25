@@ -624,12 +624,9 @@ class SHTCUDA(nn.Module):
         self.quad_weights = quad_weights
         self.lmax = lmax or self.nlat
         self.mmax = mmax or (self.nlon // 2 + 1)
-        self.stream = torch.cuda.current_stream()
 
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA device is not available. This class requires a GPU.")
-
-        self.device = torch.device('cuda')
 
         # quadrature weights
         cost, w = healpix_weights(nside, self.quad_weights)
@@ -641,13 +638,9 @@ class SHTCUDA(nn.Module):
         pct = _precompute_legpoly_torch(self.mmax, self.lmax, tq, norm=self.norm, csphase=self.csphase)
         pct = pct.to(torch.float)
 
-        if not (min(self.nside, self.lmax, self.mmax) > 2**9):
-            weights = weights.to(self.device)
-            pct = pct.to(self.device)
-
         # W for adjoint SHT for graident evaluation
         W = W_helper(w, nside)
-        W = W.to(torch.float).to(self.device)
+        W = W.to(torch.float)
 
         self.register_buffer('weights', weights, persistent=False)
         self.register_buffer('pct', pct, persistent=False)
@@ -658,8 +651,7 @@ class SHTCUDA(nn.Module):
         if torch.is_complex(x):
             raise ValueError("Input tensor must be real.")
 
-        with torch.cuda.stream(self.stream):
-            return SHTFunction.apply(x, self.weights, self.pct, self.W, self.mmax, self.lmax, self.nside)
+        return SHTFunction.apply(x, self.weights, self.pct, self.W, self.mmax, self.lmax, self.nside)
 
 
 class iSHTCUDA(nn.Module):
@@ -675,26 +667,23 @@ class iSHTCUDA(nn.Module):
         self.quad_weights = quad_weights
         self.lmax = lmax or self.nlat
         self.mmax = mmax or (self.nlon // 2 + 1)
-        self.stream = torch.cuda.current_stream()
 
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA device is not available. This class requires a GPU.")
-
-        self.device = torch.device('cuda')
 
         # quadrature weights
         cost, w = healpix_weights(nside, self.quad_weights)
         tq = np.flip(np.arccos(cost))
         weights = torch.from_numpy(w)
-        weights = weights.to(torch.float).to(self.device)
+        weights = weights.to(torch.float)
 
         # Legendre polynomials
         pct = _precompute_legpoly_torch(self.mmax, self.lmax, tq, norm=self.norm, csphase=self.csphase)
-        pct = pct.to(torch.float).to(self.device)
+        pct = pct.to(torch.float)
 
         # W for adjoint SHT for graident evaluation
         W = W_helper(w, nside)
-        W = W.to(torch.float).to(self.device)
+        W = W.to(torch.float)
 
         self.register_buffer('weights', weights, persistent=False)
         self.register_buffer('pct', pct, persistent=False)
@@ -702,5 +691,4 @@ class iSHTCUDA(nn.Module):
 
     def forward(self, x):
 
-        with torch.cuda.stream(self.stream):
-            return iSHTFunction.apply(x, self.weights, self.pct, self.W, self.mmax, self.lmax, self.nside)
+        return iSHTFunction.apply(x, self.weights, self.pct, self.W, self.mmax, self.lmax, self.nside)
