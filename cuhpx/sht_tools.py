@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import math
 import os
 
 import numpy as np
@@ -238,18 +237,18 @@ def legpoly_torch(mmax, lmax, x):
     norm_factor = 1.0
 
     # Initial values to start the recursion
-    vdm[0, 0, :] = norm_factor / math.sqrt(4 * math.pi)
+    vdm[0, 0, :] = norm_factor / np.sqrt(4 * np.pi)
 
     # Fill the diagonal and the lower diagonal
     for l in range(1, nmax):  # noqa: E741
-        vdm[l - 1, l, :] = math.sqrt(2 * l + 1) * x * vdm[l - 1, l - 1, :]
-        vdm[l, l, :] = torch.sqrt((2 * l + 1) * (1 + x) * (1 - x) / 2 / l) * vdm[l - 1, l - 1, :]
+        vdm[l - 1, l, :] = np.sqrt(2 * l + 1) * x * vdm[l - 1, l - 1, :]
+        vdm[l, l, :] = np.sqrt((2 * l + 1) * (1 + x) * (1 - x) / 2 / l) * vdm[l - 1, l - 1, :]
 
     # Fill the remaining values on the upper triangle
     for l in range(2, nmax):  # noqa: E741
         for m in range(0, l - 1):
-            factor1 = math.sqrt((2 * l - 1) / (l - m) * (2 * l + 1) / (l + m))
-            factor2 = math.sqrt((l + m - 1) / (l - m) * (2 * l + 1) / (2 * l - 3) * (l - m - 1) / (l + m))
+            factor1 = np.sqrt((2 * l - 1) / (l - m) * (2 * l + 1) / (l + m))
+            factor2 = np.sqrt((l + m - 1) / (l - m) * (2 * l + 1) / (2 * l - 3) * (l - m - 1) / (l + m))
             vdm[m, l, :] = x * factor1 * vdm[m, l - 1, :] - factor2 * vdm[m, l - 2, :]
 
     vdm = vdm[:mmax, :lmax, :]
