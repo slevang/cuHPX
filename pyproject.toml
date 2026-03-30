@@ -1,10 +1,10 @@
 [build-system]
-requires = ["scikit-build-core>=0.8", "pybind11>=2.12", "numpy"]
+requires = ["scikit-build-core>=0.8", "pybind11>=2.12", "numpy", "torch>=2.10,<2.11"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "cuHPX"
-version = "2025.8.1"
+version = "2025.8.1+torch210"
 description = "CUDA-accelerated HEALPix tools for harmonic transforms and remapping"
 authors = [
   { name = "NVIDIA", email = "asubramaniam@nvidia.com" }
@@ -17,7 +17,7 @@ dependencies = [
   "astropy",
   "torch_harmonics",
   # Expect PyTorch preinstalled in the environment; if you want to enforce:
-  "torch>=2.4",
+  "torch>=2.10,<2.11",
 ]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
@@ -36,7 +36,7 @@ classifiers = [
 
 [tool.scikit-build]
 wheel.packages = ["cuhpx"]
-cmake.minimum-version = "3.18"
+cmake.version = ">=3.18"
 cmake.source-dir = "."
 # Keep build artifacts in build/, not alongside sources
 build-dir = "build/{wheel_tag}"

@@ -9,11 +9,21 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # LTO/IPO can drop CUDA fatbins; keep it off for these extensions
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
 
-# CUDA archs default; override via -DCMAKE_CUDA_ARCHITECTURES=80;86;90
-if(NOT CMAKE_CUDA_ARCHITECTURES OR CMAKE_CUDA_ARCHITECTURES STREQUAL "OFF")
-  set(CMAKE_CUDA_ARCHITECTURES 80;86;90)  # Ampere and Hopper default
+set(CUHPX_DEFAULT_CUDA_ARCHITECTURES 75;80;86;90)
+
+# CMake can seed CUDA archs with a compiler-default value such as 52. Force a
+# more useful default for binary wheels unless the caller overrides it.
+if(NOT CMAKE_CUDA_ARCHITECTURES OR
+   CMAKE_CUDA_ARCHITECTURES STREQUAL "OFF" OR
+   CMAKE_CUDA_ARCHITECTURES STREQUAL "52")
+  set(CMAKE_CUDA_ARCHITECTURES ${CUHPX_DEFAULT_CUDA_ARCHITECTURES} CACHE STRING "CUDA archs" FORCE)
+endif()
+if(NOT DEFINED ENV{TORCH_CUDA_ARCH_LIST} OR "$ENV{TORCH_CUDA_ARCH_LIST}" STREQUAL "")
+  string(REPLACE ";" " " CUHPX_TORCH_CUDA_ARCH_LIST "${CMAKE_CUDA_ARCHITECTURES}")
+  set(ENV{TORCH_CUDA_ARCH_LIST} "${CUHPX_TORCH_CUDA_ARCH_LIST}")
 endif()
 message(STATUS "✅ cuhpx build configured. CUDA archs: ${CMAKE_CUDA_ARCHITECTURES}")
+message(STATUS "✅ cuhpx TORCH_CUDA_ARCH_LIST: $ENV{TORCH_CUDA_ARCH_LIST}")
 
 # ---------- Python / Torch ----------
 find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
