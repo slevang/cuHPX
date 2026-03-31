@@ -24,7 +24,9 @@ torch::Tensor healpix_rfft_batch(torch::Tensor f, int L, int nside) {
     // x_pad: 4D tensor, m by n by nring by padding
     // ftm: 4D tensor, m by n by nring by L
 
-    // Retrieve the current CUDA stream
+    auto device = f.device();
+    c10::cuda::OptionalCUDAGuard device_guard(device);
+    // Retrieve the current CUDA stream on the tensor's device
     at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream();
     at::cuda::CUDAStreamGuard guard(stream);
 
@@ -41,16 +43,16 @@ torch::Tensor healpix_rfft_batch(torch::Tensor f, int L, int nside) {
     // Configuration parameters
     int ntheta = 4 * nside - 1;
     int padding = 8 * nside;
-    auto device = f.device();
     auto dtype = f.scalar_type() == torch::kDouble ? torch::kComplexDouble : torch::kComplexFloat;
     int order = compute_order(nside);
 
     // Create FFT object and initialize y_pad if not already done
-    static HealpixFFT* fft = nullptr;
+    thread_local std::unique_ptr<HealpixFFT> fft;
     if (!fft || fft->needsReconfiguration(ntheta, n, padding, dtype, device)) {
-
-        delete fft; // Properly deallocate existing object
-        fft = new HealpixFFT(ntheta, n, padding, dtype, device, stream);
+        if (fft) {
+            fft->synchronizeStream();
+        }
+        fft = std::make_unique<HealpixFFT>(ntheta, n, padding, dtype, device, stream);
     } else {
         // If reconfiguration is not needed, ensure the stream is up-to-date
         fft->updateStreamIfNeeded(stream);
@@ -99,7 +101,9 @@ torch::Tensor healpix_irfft_batch(torch::Tensor ftm, int L, int nside) {
     std::vector<int64_t> batch_dims(ftm.sizes().begin(), ftm.sizes().end() - 2);
     int n = std::accumulate(batch_dims.begin(), batch_dims.end(), 1, std::multiplies<int64_t>());
 
-    // Retrieve the current CUDA stream
+    auto device = ftm.device();
+    c10::cuda::OptionalCUDAGuard device_guard(device);
+    // Retrieve the current CUDA stream on the tensor's device
     at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream();
     at::cuda::CUDAStreamGuard guard(stream);
 
@@ -107,7 +111,6 @@ torch::Tensor healpix_irfft_batch(torch::Tensor ftm, int L, int nside) {
     int padding = 8 * nside;
     int order = compute_order(nside);
 
-    auto device = ftm.device();
     auto dtype = ftm.scalar_type() == torch::kComplexDouble ? torch::kComplexDouble : torch::kComplexFloat;
     auto ftype = dtype == torch::kComplexDouble ? torch::kDouble : torch::kFloat;
 
@@ -122,10 +125,12 @@ torch::Tensor healpix_irfft_batch(torch::Tensor ftm, int L, int nside) {
     auto x_pad = torch::zeros(x_pad_size, torch::dtype(dtype).device(device));
 
     // Instantiate FFT object
-    static HealpixIFFT* ifft = nullptr;
+    thread_local std::unique_ptr<HealpixIFFT> ifft;
     if (!ifft || ifft->needsReconfiguration(ntheta, n, padding, dtype, device)) {
-        delete ifft; // Properly deallocate existing object
-        ifft = new HealpixIFFT(ntheta, n, padding, dtype, device, stream);
+        if (ifft) {
+            ifft->synchronizeStream();
+        }
+        ifft = std::make_unique<HealpixIFFT>(ntheta, n, padding, dtype, device, stream);
     } else {
         // If reconfiguration is not needed, ensure the stream is up-to-date
         ifft->updateStreamIfNeeded(stream);
@@ -154,6 +159,7 @@ torch::Tensor healpix_rfft_class(torch::Tensor f, int L, int nside) {
     int ntheta = 4 * nside - 1;
     int padding = 8 * nside;
     auto device = f.device();
+    c10::cuda::OptionalCUDAGuard device_guard(device);
     auto dtype = f.scalar_type() == torch::kDouble ? torch::kComplexDouble : torch::kComplexFloat;
 
     // Retrieve the current CUDA stream
@@ -163,10 +169,12 @@ torch::Tensor healpix_rfft_class(torch::Tensor f, int L, int nside) {
 
     // Create FFT object and initialize y_pad if not already done
 
-    static HealpixFFT* fft = nullptr;
+    thread_local std::unique_ptr<HealpixFFT> fft;
     if (!fft || fft->needsReconfiguration(ntheta, 1, padding, dtype, device)) {
-        delete fft; // Properly deallocate existing object
-        fft = new HealpixFFT(ntheta, 1, padding, dtype, device, stream);
+        if (fft) {
+            fft->synchronizeStream();
+        }
+        fft = std::make_unique<HealpixFFT>(ntheta, 1, padding, dtype, device, stream);
     } else {
         // If reconfiguration is not needed, ensure the stream is up-to-date
         fft->updateStreamIfNeeded(stream);
@@ -198,6 +206,7 @@ torch::Tensor healpix_irfft_class(torch::Tensor ftm, int L, int nside) {
     int padding = 8 * nside;
 
     auto device = ftm.device();
+    c10::cuda::OptionalCUDAGuard device_guard(device);
     auto dtype = ftm.scalar_type() == torch::kComplexDouble ? torch::kComplexDouble : torch::kComplexFloat;
     auto ftype = dtype == torch::kComplexDouble ? torch::kDouble : torch::kFloat;
 
@@ -212,10 +221,12 @@ torch::Tensor healpix_irfft_class(torch::Tensor ftm, int L, int nside) {
 
     // Instantiate FFT object
 
-    static HealpixIFFT* ifft = nullptr;
+    thread_local std::unique_ptr<HealpixIFFT> ifft;
     if (!ifft || ifft->needsReconfiguration(ntheta, 1, padding, dtype, device)) {
-        delete ifft; // Properly deallocate existing object
-        ifft = new HealpixIFFT(ntheta, 1, padding, dtype, device, stream);
+        if (ifft) {
+            ifft->synchronizeStream();
+        }
+        ifft = std::make_unique<HealpixIFFT>(ntheta, 1, padding, dtype, device, stream);
     } else {
         // If reconfiguration is not needed, ensure the stream is up-to-date
         ifft->updateStreamIfNeeded(stream);

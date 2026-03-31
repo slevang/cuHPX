@@ -24,6 +24,7 @@
 #include <cufft.h>
 #include <cuda_runtime.h>
 #include <complex>
+#include <memory>
 #include <torch/extension.h>
 #include <c10/cuda/CUDAGuard.h>
 
@@ -69,7 +70,7 @@ void rfft_pre_process_x_pad_batch_float4_dispatch(torch::Tensor x_pad, torch::Te
 class HealpixFFT{
 public:
     // Constructor initializes only the essential variables and FFT plan
-    HealpixFFT(int ntheta, int n, int padding, torch::Dtype dtype, torch::Device device, at::cuda::CUDAStream& stream)
+    HealpixFFT(int ntheta, int n, int padding, torch::Dtype dtype, torch::Device device, at::cuda::CUDAStream stream)
         : ntheta_(ntheta), n_(n), padding_(padding), dtype_(dtype), device_(device), y_pad_initialized_(false), stream_(stream){
 
         if (dtype == torch::kComplexDouble) {
@@ -130,11 +131,15 @@ public:
     }
 
     // Method to check and update the stream (non-const)
-    void updateStreamIfNeeded(at::cuda::CUDAStream& stream) {
+    void updateStreamIfNeeded(at::cuda::CUDAStream stream) {
 
         // Set the plan to the new stream
         checkCuFFTError(cufftSetStream(plan_, stream.stream()));
         stream_ = stream;
+    }
+
+    void synchronizeStream() const {
+        stream_.synchronize();
     }
 
 
@@ -153,7 +158,7 @@ private:
     torch::Device device_;
     torch::Tensor y_pad_;
     bool y_pad_initialized_;
-    at::cuda::CUDAStream& stream_;
+    at::cuda::CUDAStream stream_;
 
     void checkCuFFTError(cufftResult result) {
         if (result != CUFFT_SUCCESS) {
@@ -165,7 +170,7 @@ private:
 
 class HealpixIFFT {
 public:
-    HealpixIFFT(int ntheta, int n, int padding, torch::Dtype dtype, torch::Device device, at::cuda::CUDAStream& stream)
+    HealpixIFFT(int ntheta, int n, int padding, torch::Dtype dtype, torch::Device device, at::cuda::CUDAStream stream)
         : ntheta_(ntheta), n_(n), padding_(padding), dtype_(dtype), device_(device), y_pad_initialized_(false), stream_(stream){
 
         if (dtype == torch::kComplexDouble) {
@@ -224,10 +229,14 @@ public:
     }
 
     // Method to check and update the stream (non-const)
-    void updateStreamIfNeeded(at::cuda::CUDAStream& stream) {
+    void updateStreamIfNeeded(at::cuda::CUDAStream stream) {
         // Set the plan to the new stream
         checkCuFFTError(cufftSetStream(plan_, stream.stream()));
         stream_ = stream;
+    }
+
+    void synchronizeStream() const {
+        stream_.synchronize();
     }
 
     // Getters for current configuration
@@ -245,7 +254,7 @@ private:
     torch::Device device_;
     torch::Tensor y_pad_;
     bool y_pad_initialized_;
-    at::cuda::CUDAStream& stream_;
+    at::cuda::CUDAStream stream_;
 
     void checkCuFFTError(cufftResult result) {
         if (result != CUFFT_SUCCESS) {
